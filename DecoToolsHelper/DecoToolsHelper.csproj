@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0-windows</TargetFramework>
+		<UseWindowsForms>true</UseWindowsForms>
+		<OutputType>WinExe</OutputType>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <None Remove="Assets\tray.png" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Content Include="Assets\tray.png">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- These were already required by your working helper -->
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="Gw2Sharp" Version="1.4.7" />
+	</ItemGroup>
+
+</Project>
