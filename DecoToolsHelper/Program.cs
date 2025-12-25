@@ -43,8 +43,12 @@ namespace DecoToolsHelper
             _server.Start();
 
             // Load tray icon from PNG (converted at runtime)
-            var trayBitmap = new Bitmap("Assets\\tray.png");
+            using var stream = typeof(Program).Assembly
+    .GetManifestResourceStream("DecoToolsHelper.Assets.tray.png");
+
+            var trayBitmap = new Bitmap(stream!);
             var trayIcon = Icon.FromHandle(trayBitmap.GetHicon());
+
 
             // Create system tray icon
             _trayIcon = new NotifyIcon
