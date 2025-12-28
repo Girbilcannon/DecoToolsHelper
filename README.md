@@ -121,7 +121,7 @@ All endpoints:
 Returns:
 `{
   "running": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "apiKeyPresent": true,
   "mumbleAvailable": true
 }`
@@ -164,7 +164,7 @@ Returns:
 Keys correspond to decoration IDs used in XML files.
 
 
-### 🔹 Guild Decoration Unlocks (Targeted)
+### 🔹 Guild Decoration Storage (Targeted)
 `POST /decos/guild/{guildId}`
 Request body:
 `{
@@ -182,7 +182,6 @@ Response:
 This endpoint intentionally:
 - Requires explicit IDs
 - Does NOT allow bulk scanning
-- Returns `0` for locked upgrades
 
 
 ## 🧠 Design Philosophy (For Contributors)
