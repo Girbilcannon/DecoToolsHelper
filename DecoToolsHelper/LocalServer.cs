@@ -11,62 +11,36 @@ namespace DecoToolsHelper
     /// Responsibilities:
     /// - Proxy selected Guild Wars 2 API endpoints
     /// - Read live MumbleLink data
-    /// - Enforce safe, targeted API usage (no bulk guild scans)
+    /// - Enforce safe, targeted API usage
     /// - Provide CORS-safe local access for browser-based tools
-    /// 
-    /// The server listens ONLY on localhost (127.0.0.1).
     /// </summary>
     public class LocalServer
     {
-        // Local HTTP listener
         private readonly HttpListener _listener = new();
-
-        // Loaded user configuration (API key, paths, etc.)
         private readonly HelperConfig _config;
-
-        // GW2 API client wrapper
         private readonly Gw2ApiClient _gw2 = new();
 
-        /// <summary>
-        /// Creates a new local server instance bound to localhost.
-        /// </summary>
         public LocalServer(HelperConfig config)
         {
             _config = config;
-
-            // Only bind to localhost for security reasons
             _listener.Prefixes.Add("http://127.0.0.1:61337/");
         }
 
-        /// <summary>
-        /// Starts the HTTP listener and begins processing requests.
-        /// </summary>
         public void Start()
         {
             _listener.Start();
-
-            // Run listener loop on a background thread
             _ = Task.Run(ListenLoop);
         }
 
-        /// <summary>
-        /// Main async listener loop.
-        /// Accepts incoming HTTP requests and dispatches them for handling.
-        /// </summary>
         private async Task ListenLoop()
         {
             while (_listener.IsListening)
             {
                 var ctx = await _listener.GetContextAsync().ConfigureAwait(false);
-
-                // Handle each request on its own task
                 _ = Task.Run(() => HandleRequest(ctx));
             }
         }
 
-        /// <summary>
-        /// Routes and processes individual HTTP requests.
-        /// </summary>
         private void HandleRequest(HttpListenerContext ctx)
         {
             try
@@ -74,9 +48,9 @@ namespace DecoToolsHelper
                 var path = ctx.Request.Url?.AbsolutePath ?? "/";
                 var method = ctx.Request.HttpMethod;
 
-                // ==================================================
+                // ===============================
                 // CORS PREFLIGHT
-                // ==================================================
+                // ===============================
                 if (method == "OPTIONS")
                 {
                     ApplyCors(ctx);
@@ -85,30 +59,29 @@ namespace DecoToolsHelper
                     return;
                 }
 
-                // ==================================================
+                // ===============================
                 // STATUS
-                // ==================================================
+                // ===============================
                 if (path.Equals("/status", StringComparison.OrdinalIgnoreCase))
                 {
                     WriteJson(ctx, new
                     {
                         running = true,
-                        version = "1.0.0",
+                        version = "1.1.0",
                         apiKeyPresent = !string.IsNullOrWhiteSpace(_config.ApiKey),
                         mumbleAvailable = MumbleService.TryGet(out _, out _, out _, out _)
                     });
                     return;
                 }
 
-                // ==================================================
-                // SET API KEY (OPTIONAL, USED BY WEB UI)
-                // ==================================================
+                // ===============================
+                // SET API KEY
+                // ===============================
                 if (path.Equals("/config/apikey", StringComparison.OrdinalIgnoreCase)
                     && method == "POST")
                 {
                     using var reader = new StreamReader(ctx.Request.InputStream);
                     var body = reader.ReadToEnd();
-
                     var data = JsonConvert.DeserializeObject<dynamic>(body);
                     var key = (string?)data?.apiKey;
 
@@ -116,7 +89,6 @@ namespace DecoToolsHelper
                     {
                         _config.ApiKey = key.Trim();
                         ConfigManager.Save(_config);
-
                         WriteJson(ctx, new { success = true });
                         return;
                     }
@@ -126,27 +98,20 @@ namespace DecoToolsHelper
                     return;
                 }
 
-                // ==================================================
+                // ===============================
                 // HOMESTEAD DECORATION COUNTS
-                // ==================================================
+                // ===============================
                 if (path.Equals("/decos/homestead", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (string.IsNullOrWhiteSpace(_config.ApiKey))
-                    {
-                        ctx.Response.StatusCode = 400;
-                        WriteJson(ctx, new { error = "API key not configured" });
-                        return;
-                    }
+                    RequireApiKey(ctx);
 
                     var list = _gw2
                         .GetAsync<List<AccountHomesteadDeco>>(
                             "/v2/account/homestead/decorations",
-                            _config.ApiKey
-                        )
+                            _config.ApiKey)
                         .GetAwaiter()
                         .GetResult();
 
-                    // Convert API list into ID → count dictionary
                     var result = list.ToDictionary(
                         d => d.Id.ToString(),
                         d => d.Count
@@ -156,17 +121,12 @@ namespace DecoToolsHelper
                     return;
                 }
 
-                // ==================================================
-                // GUILD LIST (ID + NAME + TAG)
-                // ==================================================
+                // ===============================
+                // GUILD LIST
+                // ===============================
                 if (path.Equals("/guilds", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (string.IsNullOrWhiteSpace(_config.ApiKey))
-                    {
-                        ctx.Response.StatusCode = 400;
-                        WriteJson(ctx, new { error = "API key not configured" });
-                        return;
-                    }
+                    RequireApiKey(ctx);
 
                     var account = _gw2
                         .GetAsync<AccountInfo>("/v2/account", _config.ApiKey)
@@ -175,14 +135,12 @@ namespace DecoToolsHelper
 
                     var result = new List<GuildSummary>();
 
-                    // Fetch basic info for each guild the account belongs to
                     foreach (var guildId in account.Guilds)
                     {
                         var guild = _gw2
                             .GetAsync<GuildSummary>(
                                 $"/v2/guild/{guildId}",
-                                _config.ApiKey
-                            )
+                                _config.ApiKey)
                             .GetAwaiter()
                             .GetResult();
 
@@ -198,25 +156,20 @@ namespace DecoToolsHelper
                     return;
                 }
 
-                // ==================================================
-                // GUILD DECORATION COUNTS (TARGETED IDS ONLY)
-                // ==================================================
+                // ===============================
+                // GUILD DECORATION COUNTS (STORAGE)
+                // ===============================
                 if (path.StartsWith("/decos/guild/", StringComparison.OrdinalIgnoreCase)
                     && method == "POST")
                 {
-                    if (string.IsNullOrWhiteSpace(_config.ApiKey))
-                    {
-                        ctx.Response.StatusCode = 400;
-                        WriteJson(ctx, new { error = "API key not configured" });
-                        return;
-                    }
+                    RequireApiKey(ctx);
 
                     var guildId = path.Substring("/decos/guild/".Length);
 
                     using var reader = new StreamReader(ctx.Request.InputStream);
                     var body = reader.ReadToEnd();
-
                     var payload = JsonConvert.DeserializeObject<GuildIdRequest>(body);
+
                     if (payload == null || payload.Ids.Count == 0)
                     {
                         ctx.Response.StatusCode = 400;
@@ -226,36 +179,31 @@ namespace DecoToolsHelper
 
                     var idList = string.Join(",", payload.Ids);
 
-                    // GW2 API returns a list of unlocked upgrade IDs (not objects)
-                    var upgrades = _gw2
-                        .GetAsync<List<int>>(
-                            $"/v2/guild/{guildId}/upgrades?ids={idList}",
-                            _config.ApiKey
-                        )
+                    // 🔑 AUTHORITATIVE ENDPOINT
+                    var storage = _gw2
+                        .GetAsync<List<GuildStorageEntry>>(
+                            $"/v2/guild/{guildId}/storage?ids={idList}",
+                            _config.ApiKey)
                         .GetAwaiter()
                         .GetResult();
 
-                    // Initialize all requested IDs with zero count
                     var result = payload.Ids.ToDictionary(
                         id => id.ToString(),
                         _ => 0
                     );
 
-                    // Increment count for each unlocked upgrade returned
-                    foreach (var id in upgrades)
+                    foreach (var entry in storage)
                     {
-                        var key = id.ToString();
-                        if (result.ContainsKey(key))
-                            result[key]++;
+                        result[entry.Id.ToString()] = entry.Count;
                     }
 
                     WriteJson(ctx, result);
                     return;
                 }
 
-                // ==================================================
-                // MUMBLE POSITION
-                // ==================================================
+                // ===============================
+                // MUMBLE
+                // ===============================
                 if (path.Equals("/mumble", StringComparison.OrdinalIgnoreCase))
                 {
                     if (MumbleService.TryGet(out int mapId, out float x, out float y, out float z))
@@ -274,34 +222,33 @@ namespace DecoToolsHelper
                     return;
                 }
 
-                // ==================================================
-                // NOT FOUND
-                // ==================================================
                 ctx.Response.StatusCode = 404;
                 WriteJson(ctx, new { error = "Not Found" });
             }
             catch (Exception ex)
             {
                 ctx.Response.StatusCode = 500;
-                WriteJson(ctx, new
-                {
-                    error = "Server Error",
-                    detail = ex.Message
-                });
+                WriteJson(ctx, new { error = "Server Error", detail = ex.Message });
             }
         }
 
-        // ==================================================
-        // JSON RESPONSE + CORS
-        // ==================================================
+        // ===============================
+        // HELPERS
+        // ===============================
 
-        /// <summary>
-        /// Writes a JSON response with UTF-8 encoding and CORS headers.
-        /// </summary>
+        private void RequireApiKey(HttpListenerContext ctx)
+        {
+            if (string.IsNullOrWhiteSpace(_config.ApiKey))
+            {
+                ctx.Response.StatusCode = 400;
+                WriteJson(ctx, new { error = "API key not configured" });
+                throw new InvalidOperationException();
+            }
+        }
+
         private static void WriteJson(HttpListenerContext ctx, object obj)
         {
             ApplyCors(ctx);
-
             var json = JsonConvert.SerializeObject(obj);
             var bytes = Encoding.UTF8.GetBytes(json);
 
@@ -312,13 +259,9 @@ namespace DecoToolsHelper
             ctx.Response.OutputStream.Close();
         }
 
-        /// <summary>
-        /// Applies permissive CORS headers for localhost usage only.
-        /// </summary>
         private static void ApplyCors(HttpListenerContext ctx)
         {
             var origin = ctx.Request.Headers["Origin"];
-
             if (origin == null || origin == "null" || origin.StartsWith("http://localhost"))
             {
                 ctx.Response.Headers["Access-Control-Allow-Origin"] = origin ?? "null";
@@ -327,23 +270,24 @@ namespace DecoToolsHelper
             }
         }
 
-        /// <summary>
-        /// Stops the HTTP listener and releases the bound port.
-        /// Safe to call multiple times.
-        /// </summary>
         public void Stop()
         {
             try
             {
                 if (_listener.IsListening)
                     _listener.Stop();
-
                 _listener.Close();
             }
-            catch
-            {
-                // Ignore shutdown errors to ensure clean exit
-            }
+            catch { }
         }
+    }
+
+    /// <summary>
+    /// Minimal model for guild storage entries.
+    /// </summary>
+    public class GuildStorageEntry
+    {
+        public int Id { get; set; }
+        public int Count { get; set; }
     }
 }
