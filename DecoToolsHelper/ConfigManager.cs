@@ -11,18 +11,38 @@ namespace DecoToolsHelper
     /// - GW2 API key
     /// - Default save paths (Homestead / Guild Hall)
     /// 
-    /// The config file is stored alongside the executable as:
-    ///   config.json
+    /// IMPORTANT STORAGE NOTE:
+    /// -----------------------
+    /// The config file is stored in the user's AppData directory:
+    ///   %APPDATA%\DecoToolsHelper\config.json
     /// 
-    /// This file is intentionally kept outside the compiled binary so:
-    /// - Users can reset it manually
-    /// - Personal data is never embedded in the EXE
+    /// This is REQUIRED for:
+    /// - Single-file published executables
+    /// - Self-contained builds
+    /// - Portable EXEs
+    /// 
+    /// Storing config next to the executable is NOT reliable once
+    /// PublishSingleFile=true is used, because the runtime extracts
+    /// the app to a temporary directory at launch.
+    /// 
+    /// This design ensures:
+    /// - API keys persist across launches
+    /// - Config is not embedded in the EXE
+    /// - Users can manually reset config
+    /// - No admin permissions are required
     /// </summary>
     public static class ConfigManager
     {
-        // Absolute path to config.json (same folder as the executable)
+        // Base directory in AppData for this helper
+        private static readonly string ConfigDirectory =
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "DecoToolsHelper"
+            );
+
+        // Absolute path to config.json
         private static readonly string ConfigPath =
-            Path.Combine(AppContext.BaseDirectory, "config.json");
+            Path.Combine(ConfigDirectory, "config.json");
 
         /// <summary>
         /// Loads configuration from disk.
@@ -35,11 +55,11 @@ namespace DecoToolsHelper
         /// </summary>
         public static HelperConfig Load()
         {
-            if (!File.Exists(ConfigPath))
-                return new HelperConfig();
-
             try
             {
+                if (!File.Exists(ConfigPath))
+                    return new HelperConfig();
+
                 var text = File.ReadAllText(ConfigPath);
 
                 // Deserialize into HelperConfig.
@@ -60,9 +80,14 @@ namespace DecoToolsHelper
         /// 
         /// Uses indented JSON for readability and easy manual editing.
         /// Overwrites the existing file if present.
+        /// 
+        /// The directory is created automatically if missing.
         /// </summary>
         public static void Save(HelperConfig config)
         {
+            // Ensure AppData directory exists
+            Directory.CreateDirectory(ConfigDirectory);
+
             var json = JsonConvert.SerializeObject(
                 config,
                 Formatting.Indented

@@ -22,7 +22,7 @@ namespace DecoToolsHelper
     /// </summary>
     public class MainForm : Form
     {
-        // Loaded user configuration
+        // 🔑 SHARED configuration instance (owned by Program.cs)
         private readonly HelperConfig _config;
 
         // API key UI
@@ -36,11 +36,11 @@ namespace DecoToolsHelper
         private TextBox _txtGuildHallPath = null!;
 
         /// <summary>
-        /// Creates the configuration window and initializes UI state.
+        /// Creates the configuration window using the shared HelperConfig.
         /// </summary>
-        public MainForm()
+        public MainForm(HelperConfig config)
         {
-            _config = ConfigManager.Load();
+            _config = config;
 
             Text = "GW2 Deco Tools Helper";
             Width = 560;
@@ -55,7 +55,6 @@ namespace DecoToolsHelper
 
         /// <summary>
         /// Constructs the entire UI layout programmatically.
-        /// This avoids designer files and keeps the helper fully portable.
         /// </summary>
         private void BuildUI()
         {
@@ -135,7 +134,6 @@ namespace DecoToolsHelper
 
             mumbleLink.LinkClicked += (_, _) =>
             {
-                // Open the local Mumble endpoint in the default browser
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "http://127.0.0.1:61337/mumble",
@@ -162,7 +160,7 @@ namespace DecoToolsHelper
             AddTip("• Make sure the game is running with a character on a live map.", ref y);
             AddTip("• If Mumble shows \"false\", refresh the page a few times once in a game map.", ref y);
             AddTip("• Safe to close this window. The tool continues running in the system tray.", ref y);
-            AddTip("• If you have trouble with the API key or save paths, fully exit the tool and delete \"config.json\" (located next to this application).", ref y);
+            AddTip("• If you have trouble with the API key or save paths, fully exit the tool and delete the config file.", ref y);
         }
 
         /// <summary>
@@ -189,9 +187,6 @@ namespace DecoToolsHelper
 
         // ================= API =================
 
-        /// <summary>
-        /// Saves a newly entered API key to config.json.
-        /// </summary>
         private void SaveApiKey()
         {
             var key = _txtApiKey.Text.Trim();
@@ -203,9 +198,6 @@ namespace DecoToolsHelper
             RefreshState();
         }
 
-        /// <summary>
-        /// Removes the stored API key and disables API-backed features.
-        /// </summary>
         private void RemoveApiKey()
         {
             _config.ApiKey = null;
@@ -216,9 +208,6 @@ namespace DecoToolsHelper
 
         // ================= PATHS =================
 
-        /// <summary>
-        /// Creates a labeled folder path row with a browse button.
-        /// </summary>
         private TextBox PathRow(string label, string defaultValue, ref int y)
         {
             Controls.Add(new Label
@@ -253,9 +242,6 @@ namespace DecoToolsHelper
             return box;
         }
 
-        /// <summary>
-        /// Opens a folder picker and saves the selected path.
-        /// </summary>
         private void BrowseFolder(TextBox target)
         {
             using var dlg = new FolderBrowserDialog();
@@ -266,9 +252,6 @@ namespace DecoToolsHelper
             }
         }
 
-        /// <summary>
-        /// Persists the configured save paths to disk.
-        /// </summary>
         private void SavePaths()
         {
             _config.HomesteadPath = _txtHomesteadPath.Text;
@@ -325,10 +308,6 @@ namespace DecoToolsHelper
             );
         }
 
-        /// <summary>
-        /// Hides the window instead of closing it.
-        /// The helper continues running in the system tray.
-        /// </summary>
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             e.Cancel = true;

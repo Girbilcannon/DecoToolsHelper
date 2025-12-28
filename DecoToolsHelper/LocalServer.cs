@@ -11,8 +11,10 @@ namespace DecoToolsHelper
     /// Responsibilities:
     /// - Proxy selected Guild Wars 2 API endpoints
     /// - Read live MumbleLink data
-    /// - Enforce safe, targeted API usage
+    /// - Enforce safe, targeted API usage (no bulk guild scans)
     /// - Provide CORS-safe local access for browser-based tools
+    /// 
+    /// The server listens ONLY on localhost (127.0.0.1).
     /// </summary>
     public class LocalServer
     {
@@ -48,9 +50,9 @@ namespace DecoToolsHelper
                 var path = ctx.Request.Url?.AbsolutePath ?? "/";
                 var method = ctx.Request.HttpMethod;
 
-                // ===============================
+                // ==================================================
                 // CORS PREFLIGHT
-                // ===============================
+                // ==================================================
                 if (method == "OPTIONS")
                 {
                     ApplyCors(ctx);
@@ -59,9 +61,9 @@ namespace DecoToolsHelper
                     return;
                 }
 
-                // ===============================
+                // ==================================================
                 // STATUS
-                // ===============================
+                // ==================================================
                 if (path.Equals("/status", StringComparison.OrdinalIgnoreCase))
                 {
                     WriteJson(ctx, new
@@ -74,9 +76,9 @@ namespace DecoToolsHelper
                     return;
                 }
 
-                // ===============================
+                // ==================================================
                 // SET API KEY
-                // ===============================
+                // ==================================================
                 if (path.Equals("/config/apikey", StringComparison.OrdinalIgnoreCase)
                     && method == "POST")
                 {
@@ -98,12 +100,17 @@ namespace DecoToolsHelper
                     return;
                 }
 
-                // ===============================
+                // ==================================================
                 // HOMESTEAD DECORATION COUNTS
-                // ===============================
+                // ==================================================
                 if (path.Equals("/decos/homestead", StringComparison.OrdinalIgnoreCase))
                 {
-                    RequireApiKey(ctx);
+                    if (string.IsNullOrWhiteSpace(_config.ApiKey))
+                    {
+                        ctx.Response.StatusCode = 400;
+                        WriteJson(ctx, new { error = "API key not configured" });
+                        return;
+                    }
 
                     var list = _gw2
                         .GetAsync<List<AccountHomesteadDeco>>(
@@ -121,12 +128,17 @@ namespace DecoToolsHelper
                     return;
                 }
 
-                // ===============================
-                // GUILD LIST
-                // ===============================
+                // ==================================================
+                // GUILD LIST (ID + NAME + TAG)
+                // ==================================================
                 if (path.Equals("/guilds", StringComparison.OrdinalIgnoreCase))
                 {
-                    RequireApiKey(ctx);
+                    if (string.IsNullOrWhiteSpace(_config.ApiKey))
+                    {
+                        ctx.Response.StatusCode = 400;
+                        WriteJson(ctx, new { error = "API key not configured" });
+                        return;
+                    }
 
                     var account = _gw2
                         .GetAsync<AccountInfo>("/v2/account", _config.ApiKey)
@@ -156,13 +168,18 @@ namespace DecoToolsHelper
                     return;
                 }
 
-                // ===============================
-                // GUILD DECORATION COUNTS (STORAGE)
-                // ===============================
+                // ==================================================
+                // GUILD DECORATION COUNTS (AUTHORITATIVE STORAGE)
+                // ==================================================
                 if (path.StartsWith("/decos/guild/", StringComparison.OrdinalIgnoreCase)
                     && method == "POST")
                 {
-                    RequireApiKey(ctx);
+                    if (string.IsNullOrWhiteSpace(_config.ApiKey))
+                    {
+                        ctx.Response.StatusCode = 400;
+                        WriteJson(ctx, new { error = "API key not configured" });
+                        return;
+                    }
 
                     var guildId = path.Substring("/decos/guild/".Length);
 
@@ -179,9 +196,9 @@ namespace DecoToolsHelper
 
                     var idList = string.Join(",", payload.Ids);
 
-                    // 🔑 AUTHORITATIVE ENDPOINT
+                    // 🔑 AUTHORITATIVE GUILD STORAGE ENDPOINT
                     var storage = _gw2
-                        .GetAsync<List<GuildStorageEntry>>(
+                        .GetAsync<List<GuildStorageItem>>(
                             $"/v2/guild/{guildId}/storage?ids={idList}",
                             _config.ApiKey)
                         .GetAwaiter()
@@ -192,18 +209,18 @@ namespace DecoToolsHelper
                         _ => 0
                     );
 
-                    foreach (var entry in storage)
+                    foreach (var item in storage)
                     {
-                        result[entry.Id.ToString()] = entry.Count;
+                        result[item.Id.ToString()] = item.Count;
                     }
 
                     WriteJson(ctx, result);
                     return;
                 }
 
-                // ===============================
-                // MUMBLE
-                // ===============================
+                // ==================================================
+                // MUMBLE POSITION
+                // ==================================================
                 if (path.Equals("/mumble", StringComparison.OrdinalIgnoreCase))
                 {
                     if (MumbleService.TryGet(out int mapId, out float x, out float y, out float z))
@@ -232,23 +249,10 @@ namespace DecoToolsHelper
             }
         }
 
-        // ===============================
-        // HELPERS
-        // ===============================
-
-        private void RequireApiKey(HttpListenerContext ctx)
-        {
-            if (string.IsNullOrWhiteSpace(_config.ApiKey))
-            {
-                ctx.Response.StatusCode = 400;
-                WriteJson(ctx, new { error = "API key not configured" });
-                throw new InvalidOperationException();
-            }
-        }
-
         private static void WriteJson(HttpListenerContext ctx, object obj)
         {
             ApplyCors(ctx);
+
             var json = JsonConvert.SerializeObject(obj);
             var bytes = Encoding.UTF8.GetBytes(json);
 
@@ -262,6 +266,7 @@ namespace DecoToolsHelper
         private static void ApplyCors(HttpListenerContext ctx)
         {
             var origin = ctx.Request.Headers["Origin"];
+
             if (origin == null || origin == "null" || origin.StartsWith("http://localhost"))
             {
                 ctx.Response.Headers["Access-Control-Allow-Origin"] = origin ?? "null";
@@ -276,18 +281,13 @@ namespace DecoToolsHelper
             {
                 if (_listener.IsListening)
                     _listener.Stop();
+
                 _listener.Close();
             }
-            catch { }
+            catch
+            {
+                // Ignore shutdown errors
+            }
         }
-    }
-
-    /// <summary>
-    /// Minimal model for guild storage entries.
-    /// </summary>
-    public class GuildStorageEntry
-    {
-        public int Id { get; set; }
-        public int Count { get; set; }
     }
 }
