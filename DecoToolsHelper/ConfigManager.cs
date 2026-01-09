@@ -4,10 +4,7 @@ using System.IO;
 
 namespace DecoToolsHelper
 {
-    /// <summary>
     /// Handles loading and saving user-specific configuration data.
-    /// 
-    /// This includes:
     /// - GW2 API key
     /// - Default save paths (Homestead / Guild Hall)
     /// 
@@ -21,16 +18,11 @@ namespace DecoToolsHelper
     /// - Self-contained builds
     /// - Portable EXEs
     /// 
-    /// Storing config next to the executable is NOT reliable once
-    /// PublishSingleFile=true is used, because the runtime extracts
-    /// the app to a temporary directory at launch.
-    /// 
     /// This design ensures:
     /// - API keys persist across launches
     /// - Config is not embedded in the EXE
     /// - Users can manually reset config
     /// - No admin permissions are required
-    /// </summary>
     public static class ConfigManager
     {
         // Base directory in AppData for this helper
@@ -44,7 +36,6 @@ namespace DecoToolsHelper
         private static readonly string ConfigPath =
             Path.Combine(ConfigDirectory, "config.json");
 
-        /// <summary>
         /// Loads configuration from disk.
         /// 
         /// Failure-safe behavior:
@@ -52,7 +43,6 @@ namespace DecoToolsHelper
         /// - Corrupt JSON → return default config
         /// 
         /// This ensures the helper never fails to start due to config issues.
-        /// </summary>
         public static HelperConfig Load()
         {
             try
@@ -75,14 +65,12 @@ namespace DecoToolsHelper
             }
         }
 
-        /// <summary>
         /// Saves configuration to disk.
         /// 
         /// Uses indented JSON for readability and easy manual editing.
         /// Overwrites the existing file if present.
         /// 
         /// The directory is created automatically if missing.
-        /// </summary>
         public static void Save(HelperConfig config)
         {
             // Ensure AppData directory exists

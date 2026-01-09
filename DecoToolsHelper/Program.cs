@@ -11,14 +11,14 @@ namespace DecoToolsHelper
         private static MainForm? _mainForm;
         private static LocalServer? _server;
 
-        // 🔑 SINGLE shared config instance for the entire app
+        // SINGLE shared config instance for the entire app
         private static HelperConfig? _config;
 
         [STAThread]
         static void Main()
         {
             // ==================================================
-            // 🔐 REQUIRED for GW2 API (TLS 1.2)
+            // REQUIRED for GW2 API (TLS 1.2)
             // ==================================================
             System.Net.ServicePointManager.SecurityProtocol =
                 System.Net.SecurityProtocolType.Tls12;
@@ -99,7 +99,7 @@ namespace DecoToolsHelper
                 return;
 
             if (_mainForm == null || _mainForm.IsDisposed)
-                _mainForm = new MainForm(_config); // ✅ SAME INSTANCE
+                _mainForm = new MainForm(_config); // SAME INSTANCE
 
             if (!_mainForm.Visible)
                 _mainForm.Show();

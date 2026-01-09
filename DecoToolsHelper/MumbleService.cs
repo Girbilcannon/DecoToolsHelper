@@ -3,8 +3,7 @@ using Gw2Sharp.Mumble;
 
 namespace DecoToolsHelper
 {
-    /// <summary>
-    /// Provides access to live Guild Wars 2 MumbleLink data.
+    /// Provides access to GW2 MumbleLink data.
     /// 
     /// This service:
     /// - Reads GW2 shared memory directly
@@ -14,7 +13,6 @@ namespace DecoToolsHelper
     /// Used for:
     /// - Player position
     /// - Current map ID
-    /// </summary>
     public static class MumbleService
     {
         // Gw2Sharp Mumble client bound to the default "MumbleLink" shared memory block

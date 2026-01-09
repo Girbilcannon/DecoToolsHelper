@@ -8,7 +8,6 @@ using Label = System.Windows.Forms.Label;
 
 namespace DecoToolsHelper
 {
-    /// <summary>
     /// Main configuration window for the Deco Tools Helper.
     /// 
     /// Responsibilities:
@@ -19,10 +18,9 @@ namespace DecoToolsHelper
     /// 
     /// This window is optional and may be hidden while the helper
     /// continues running in the system tray.
-    /// </summary>
     public class MainForm : Form
     {
-        // 🔑 SHARED configuration instance (owned by Program.cs)
+        // SHARED configuration instance (owned by Program.cs)
         private readonly HelperConfig _config;
 
         // API key UI
@@ -35,9 +33,7 @@ namespace DecoToolsHelper
         private TextBox _txtHomesteadPath = null!;
         private TextBox _txtGuildHallPath = null!;
 
-        /// <summary>
         /// Creates the configuration window using the shared HelperConfig.
-        /// </summary>
         public MainForm(HelperConfig config)
         {
             _config = config;
@@ -53,9 +49,7 @@ namespace DecoToolsHelper
             RefreshState();
         }
 
-        /// <summary>
         /// Constructs the entire UI layout programmatically.
-        /// </summary>
         private void BuildUI()
         {
             int y = 15;
@@ -126,7 +120,7 @@ namespace DecoToolsHelper
 
             var mumbleLink = new LinkLabel
             {
-                Text = "View live Mumble data (http://127.0.0.1:61337/mumble)",
+                Text = "View live Helper status (http://localhost:61337/status)",
                 Left = 20,
                 Top = y,
                 AutoSize = true
@@ -136,7 +130,7 @@ namespace DecoToolsHelper
             {
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = "http://127.0.0.1:61337/mumble",
+                    FileName = "http://localhost:61337/status",
                     UseShellExecute = true
                 });
             };
@@ -163,9 +157,7 @@ namespace DecoToolsHelper
             AddTip("• If you have trouble with the API key or save paths, fully exit the tool and delete the config file.", ref y);
         }
 
-        /// <summary>
         /// Updates UI controls based on current configuration state.
-        /// </summary>
         private void RefreshState()
         {
             bool hasKey = !string.IsNullOrWhiteSpace(_config.ApiKey);

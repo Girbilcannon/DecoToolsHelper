@@ -10,14 +10,12 @@ using Newtonsoft.Json;
 
 namespace DecoToolsHelper
 {
-    /// <summary>
     /// Builds and maintains a unified local decoration database by merging:
     /// - Guild hall decorations (guild upgrades of type "Decoration")
     /// - Homestead decorations
     ///
     /// Uses public GW2 API endpoints only.
     /// Automatically rebuilds when new IDs are detected.
-    /// </summary>
     public static class DecoDBBuilder
     {
         private const int DbVersion = 1;

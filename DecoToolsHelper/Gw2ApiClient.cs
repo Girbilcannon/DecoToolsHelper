@@ -3,8 +3,7 @@ using Newtonsoft.Json;
 
 namespace DecoToolsHelper
 {
-    /// <summary>
-    /// Minimal wrapper around the Guild Wars 2 public API.
+    /// Minimal wrapper for GW2 API.
     /// 
     /// Design goals:
     /// - Centralize authenticated API requests
@@ -14,26 +13,13 @@ namespace DecoToolsHelper
     /// This helper intentionally supports:
     /// - GET requests only
     /// - Explicit endpoint paths passed by the caller
-    /// </summary>
     public class Gw2ApiClient
     {
-        // Reused HttpClient instance (recommended best practice)
+        // Reused HttpClient instance
         private readonly HttpClient _http = new();
 
-        /// <summary>
         /// Performs an authenticated GET request to the GW2 API
         /// and deserializes the JSON response into the requested type.
-        /// </summary>
-        /// <typeparam name="T">Expected deserialized response type</typeparam>
-        /// <param name="endpoint">
-        /// API endpoint path (example: /v2/account)
-        /// </param>
-        /// <param name="apiKey">
-        /// User-provided GW2 API key
-        /// </param>
-        /// <returns>
-        /// Deserialized response object
-        /// </returns>
         public async Task<T> GetAsync<T>(string endpoint, string apiKey)
         {
             var req = new HttpRequestMessage(

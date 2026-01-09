@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 
 namespace DecoToolsHelper
 {
-    /// <summary>
     /// Lightweight local HTTP server used by the Deco Tools web UI.
     /// 
     /// Responsibilities:
@@ -19,7 +18,6 @@ namespace DecoToolsHelper
     /// - Provide CORS-safe local access for browser-based tools
     /// 
     /// The server listens ONLY on localhost.
-    /// </summary>
     public class LocalServer
     {
         private readonly HttpListener _listener = new();
@@ -51,7 +49,7 @@ namespace DecoToolsHelper
         {
             try
             {
-                // 🔑 KNOWN-GOOD CORS BEHAVIOR (DO NOT MODIFY)
+                // KNOWN GOOD CORS BEHAVIOR (DO NOT MODIFY)
                 ApplyCors(ctx);
 
                 var path = ctx.Request.Url?.AbsolutePath ?? "/";
