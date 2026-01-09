@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace DecoToolsHelper
@@ -16,6 +17,12 @@ namespace DecoToolsHelper
         [STAThread]
         static void Main()
         {
+            // ==================================================
+            // 🔐 REQUIRED for GW2 API (TLS 1.2)
+            // ==================================================
+            System.Net.ServicePointManager.SecurityProtocol =
+                System.Net.SecurityProtocolType.Tls12;
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
@@ -25,6 +32,24 @@ namespace DecoToolsHelper
             // Start the local helper HTTP server
             _server = new LocalServer(_config);
             _server.Start();
+
+            // ==================================================
+            // Phase 3: Ensure decoration database is up to date
+            // (Silent, non-blocking, production-safe)
+            // ==================================================
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await DecoDBBuilder.EnsureUpToDateAsync();
+                }
+                catch
+                {
+                    // Intentionally ignored:
+                    // - Never block startup
+                    // - Existing DB (if any) remains usable
+                }
+            });
 
             // Load tray icon from embedded resource
             using var stream = typeof(Program).Assembly

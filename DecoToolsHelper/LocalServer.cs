@@ -2,6 +2,10 @@
 using System.Net;
 using System.Text;
 using Newtonsoft.Json;
+using System.IO;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace DecoToolsHelper
 {
@@ -14,7 +18,7 @@ namespace DecoToolsHelper
     /// - Enforce safe, targeted API usage (no bulk guild scans)
     /// - Provide CORS-safe local access for browser-based tools
     /// 
-    /// The server listens ONLY on localhost (127.0.0.1).
+    /// The server listens ONLY on localhost.
     /// </summary>
     public class LocalServer
     {
@@ -25,7 +29,7 @@ namespace DecoToolsHelper
         public LocalServer(HelperConfig config)
         {
             _config = config;
-            _listener.Prefixes.Add("http://127.0.0.1:61337/");
+            _listener.Prefixes.Add("http://localhost:61337/");
         }
 
         public void Start()
@@ -47,17 +51,21 @@ namespace DecoToolsHelper
         {
             try
             {
+                // 🔑 KNOWN-GOOD CORS BEHAVIOR (DO NOT MODIFY)
+                ApplyCors(ctx);
+
                 var path = ctx.Request.Url?.AbsolutePath ?? "/";
                 var method = ctx.Request.HttpMethod;
 
                 // ==================================================
-                // CORS PREFLIGHT
+                // CORS PREFLIGHT (IMPORTANT: MUST END CLEANLY)
                 // ==================================================
                 if (method == "OPTIONS")
                 {
-                    ApplyCors(ctx);
-                    ctx.Response.StatusCode = 200;
-                    ctx.Response.Close();
+                    // CORS headers already applied via ApplyCors(ctx)
+                    ctx.Response.StatusCode = 204; // No Content (preferred for preflight)
+                    ctx.Response.ContentLength64 = 0;
+                    ctx.Response.OutputStream.Close();
                     return;
                 }
 
@@ -69,9 +77,72 @@ namespace DecoToolsHelper
                     WriteJson(ctx, new
                     {
                         running = true,
-                        version = "1.1.0",
+                        version = "1.2.0",
                         apiKeyPresent = !string.IsNullOrWhiteSpace(_config.ApiKey),
                         mumbleAvailable = MumbleService.TryGet(out _, out _, out _, out _)
+                    });
+                    return;
+                }
+
+                // ==================================================
+                // DECORATION DATABASE (FULL, READ-ONLY)
+                // ==================================================
+                if (path.Equals("/decorations", StringComparison.OrdinalIgnoreCase)
+                    && method == "GET")
+                {
+                    var db = DecoDBBuilder.TryLoad();
+
+                    if (db == null)
+                    {
+                        ctx.Response.StatusCode = 503;
+                        WriteJson(ctx, new { error = "Decoration database not ready" });
+                        return;
+                    }
+
+                    WriteJson(ctx, db);
+                    return;
+                }
+
+                // ==================================================
+                // DECORATION LOOKUP (LIGHTWEIGHT)
+                // GET /decorations/lookup?name=Exact Name
+                // ==================================================
+                if (path.Equals("/decorations/lookup", StringComparison.OrdinalIgnoreCase)
+                    && method == "GET")
+                {
+                    var db = DecoDBBuilder.TryLoad();
+
+                    if (db == null)
+                    {
+                        ctx.Response.StatusCode = 503;
+                        WriteJson(ctx, new { error = "Decoration database not ready" });
+                        return;
+                    }
+
+                    var name = ctx.Request.QueryString["name"];
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        ctx.Response.StatusCode = 400;
+                        WriteJson(ctx, new { error = "Missing name parameter" });
+                        return;
+                    }
+
+                    var match = db.Decorations.FirstOrDefault(d =>
+                        string.Equals(d.Name, name.Trim(),
+                            StringComparison.OrdinalIgnoreCase));
+
+                    if (match == null)
+                    {
+                        ctx.Response.StatusCode = 404;
+                        WriteJson(ctx, new { error = "Decoration not found" });
+                        return;
+                    }
+
+                    WriteJson(ctx, new
+                    {
+                        name = match.Name,
+                        homesteadId = match.HomesteadId,
+                        guildUpgradeId = match.GuildUpgradeId
                     });
                     return;
                 }
@@ -131,7 +202,8 @@ namespace DecoToolsHelper
                 // ==================================================
                 // GUILD LIST (ID + NAME + TAG)
                 // ==================================================
-                if (path.Equals("/guilds", StringComparison.OrdinalIgnoreCase))
+                if (path.Equals("/guilds", StringComparison.OrdinalIgnoreCase)
+                    && method == "GET")
                 {
                     if (string.IsNullOrWhiteSpace(_config.ApiKey))
                     {
@@ -196,7 +268,6 @@ namespace DecoToolsHelper
 
                     var idList = string.Join(",", payload.Ids);
 
-                    // 🔑 AUTHORITATIVE GUILD STORAGE ENDPOINT
                     var storage = _gw2
                         .GetAsync<List<GuildStorageItem>>(
                             $"/v2/guild/{guildId}/storage?ids={idList}",
@@ -251,14 +322,12 @@ namespace DecoToolsHelper
 
         private static void WriteJson(HttpListenerContext ctx, object obj)
         {
-            ApplyCors(ctx);
-
             var json = JsonConvert.SerializeObject(obj);
             var bytes = Encoding.UTF8.GetBytes(json);
 
             ctx.Response.ContentType = "application/json";
             ctx.Response.ContentEncoding = Encoding.UTF8;
-            ctx.Response.StatusCode = 200;
+            ctx.Response.StatusCode = ctx.Response.StatusCode == 0 ? 200 : ctx.Response.StatusCode;
             ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
             ctx.Response.OutputStream.Close();
         }
@@ -267,7 +336,11 @@ namespace DecoToolsHelper
         {
             var origin = ctx.Request.Headers["Origin"];
 
-            if (origin == null || origin == "null" || origin.StartsWith("http://localhost"))
+            if (origin == null ||
+                origin == "null" ||
+                origin.StartsWith("http://localhost") ||
+                origin == "https://gw2decotools.com" ||
+                (origin.StartsWith("https://") && origin.Contains(".github.io")))
             {
                 ctx.Response.Headers["Access-Control-Allow-Origin"] = origin ?? "null";
                 ctx.Response.Headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
