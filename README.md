@@ -105,7 +105,7 @@ This section is for developers who want to:
 
 ## 🌐 Local Server Overview
 The helper runs a local HTTP server at:
-`http://127.0.0.1:61337`
+`http://localhost:61337`
 
 All endpoints:
 - Return JSON
@@ -177,6 +177,36 @@ Response:
   "456": 0,
   "789": 2
 }`
+
+
+### 🔹 Decoration ID Variants
+`GET /decorations`
+**Used For:**
+- Mapping <prop name=""> → correct target id
+- Determining whether a decoration has
+-- a Homestead counterpart
+-- a Guild Hall counterpart
+- Excluding decorations that cannot exist on the target map
+
+Response:
+`{
+  "Decorations": [
+    {
+      "Name": "Basic Chair",
+      "HomesteadId": 12345,
+      "GuildUpgradeId": 67890
+    }
+  ]
+}`
+
+
+### 🔹 Decoration ID Lookup (optional / auxiliary)
+`GET /decorations/lookup`
+**Used For:**
+- Debugging
+- Validation
+
+
 
 🔒 **Important:**
 This endpoint intentionally:
